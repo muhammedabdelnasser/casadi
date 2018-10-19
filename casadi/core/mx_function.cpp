@@ -64,6 +64,13 @@ namespace casadi {
      }
   };
 
+  Dict MXFunction::generate_options() const {
+    Dict opts = FunctionInternal::generate_options();
+    //opts["default_in"] = default_in_;
+    opts["live_variables"] = live_variables_;
+    return opts;
+  }
+
   MX MXFunction::instruction_MX(casadi_int k) const {
     return algorithm_.at(k).data;
   }
@@ -94,14 +101,14 @@ namespace casadi {
     if (verbose_) casadi_message(name_ + "::init");
 
     // Default (temporary) options
-    bool live_variables = true;
+    live_variables_ = true;
 
     // Read options
     for (auto&& op : opts) {
       if (op.first=="default_in") {
         default_in_ = op.second;
       } else if (op.first=="live_variables") {
-        live_variables = op.second;
+        live_variables_ = op.second;
       }
     }
 
@@ -243,7 +250,7 @@ namespace casadi {
             casadi_int remaining = --refcount[ch_ind];
 
             // Free variable for reuse
-            if (live_variables && remaining==0) {
+            if (live_variables_ && remaining==0) {
 
               // Get a pointer to the sparsity pattern of the argument that can be freed
               casadi_int nnz = nodes[ch_ind]->sparsity().nnz();
@@ -269,7 +276,7 @@ namespace casadi {
           if (e.res[c]>=0) {
 
             // Are reuse of variables (live variables) enabled?
-            if (live_variables) {
+            if (live_variables_) {
               // Get a pointer to the sparsity pattern node
               casadi_int nnz = e.data->sparsity(c).nnz();
 
@@ -292,7 +299,7 @@ namespace casadi {
     }
 
     if (verbose_) {
-      if (live_variables) {
+      if (live_variables_) {
         casadi_message("Using live variables: work array is " + str(worksize)
                        + " instead of " + str(nodes.size()));
       } else {
@@ -712,6 +719,11 @@ namespace casadi {
         }
       }
 
+      if (!enable_forward_) {
+        FunctionInternal::call_forward(in_, out_, fseed, fsens, false, false);
+        return;
+      }
+
       // Work vector, forward derivatives
       std::vector<std::vector<MX> > dwork(workloc_.size()-1);
       fill(dwork.begin(), dwork.end(), std::vector<MX>(nfwd));
@@ -863,6 +875,23 @@ namespace casadi {
           }
           return;
         }
+      }
+
+      if (!enable_reverse_) {
+        vector<vector<MX> > v;
+        FunctionInternal::call_reverse(in_, out_, aseed, v, false, false);
+        for (casadi_int i=0; i<v.size(); ++i) {
+          for (casadi_int j=0; j<v[i].size(); ++j) {
+            if (!v[i][j].is_empty()) { // TODO(@jaeandersson): Hack
+              if (asens[i][j].is_empty()) {
+                asens[i][j] = v[i][j];
+              } else {
+                asens[i][j] += v[i][j];
+              }
+            }
+          }
+        }
+        return;
       }
 
       // Split up aseed analogous to symbolic primitives

@@ -86,6 +86,9 @@ namespace casadi {
     virtual const Options& get_options() const { return options_;}
     ///@}
 
+    /// Reconstruct options dict
+    virtual Dict generate_options() const;
+
     /** \brief Initialize
         Initialize and make the object ready for setting arguments and evaluation.
         This method is typically called after setting options but before evaluating.
@@ -182,6 +185,9 @@ namespace casadi {
     static const Options options_;
     const Options& get_options() const override { return options_;}
     ///@}
+
+    /// Reconstruct options dict
+    Dict generate_options() const override;
 
     /** \brief Initialize */
     void init(const Dict& opts) override;
@@ -799,6 +805,10 @@ namespace casadi {
 
     // Finite difference method
     std::string fd_method_;
+
+    // Print input/output
+    bool print_in_;
+    bool print_out_;
 
     /** \brief Check if the function is of a particular type */
     virtual bool is_a(const std::string& type, bool recursive) const;
